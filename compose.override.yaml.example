@@ -1,0 +1,62 @@
+# compose.override.yaml.example
+#
+# Copy to compose.override.yaml to override the base compose.yaml for local
+# dev. Useful knobs:
+#   - mount the persona source tree for hot iteration
+#   - forward extra ports (debug ports, REPL)
+#   - swap in a different relay image / config
+#   - enable TTY allocation so `docker compose exec` behaves nicely
+#
+# Docker Compose automatically merges compose.override.yaml on top of
+# compose.yaml when both are present. No need to pass -f for the override.
+#
+# Examples below — uncomment what you need.
+
+services:
+  # persona-a:
+  #   # Drop your persona source into the container for hot iteration.
+  #   # Adjust the host path to your checkout.
+  #   volumes:
+  #     - ./personas/persona-a:/src:rw
+  #     # Uncomment to override the persona entrypoint with a dev loop:
+  #     # - ./personas/persona-a/dev-loop.sh:/usr/local/bin/persona-entrypoint.sh:ro
+  #   # TTY + stdin for `docker compose exec` / `run`.
+  #   tty: true
+  #   stdin_open: true
+  #   environment:
+  #     - PERSONA_LOG_LEVEL=debug
+  #   # Forward a debug port (e.g. debugpy on 5678).
+  #   ports:
+  #     - "127.0.0.1:5678:5678"
+
+  # persona-b:
+  #   # Same idea for persona-b. Keep the bind-mounts from compose.yaml —
+  #   # this file only adds, it doesn't replace.
+  #   volumes:
+  #     - ./personas/persona-b:/src:rw
+  #   tty: true
+  #   stdin_open: true
+
+  # strfry:
+  #   # Try a custom relay image or pin a specific version:
+  #   # image: holdstockconsulting/strfry:v0.9.4
+  #   # Mount a local strfry.conf for quick tweaks:
+  #   # volumes:
+  #   #   - ./strfry/strfry.conf:/etc/strfry.conf:ro
+  #   # Forward the relay port to the host so external clients can hit it.
+  #   # NOTE: this exposes the relay to your LAN. Auth is enforced, but still —
+  #   # be deliberate about it.
+  #   # ports:
+  #   #   - "127.0.0.1:7777:7777"
+
+# Network notes:
+# - The base file already defines a shared `nostr` network. Add a second one
+#   here if a service needs to be reachable from your laptop but NOT from
+#   other personas.
+#   Example:
+#     networks:
+#       host-only:
+#         driver: bridge
+#       nostr:
+#         aliases:
+#           - persona-a-dev

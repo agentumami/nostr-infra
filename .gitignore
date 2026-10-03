@@ -1,0 +1,26 @@
+# Compose / docker
+.docker/
+docker-compose.override.yaml
+
+# Node / build
+node_modules/
+*.log
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Local secrets
+.env
+*.key
+*.secret
+.git-auth/
+
+# Editor scratch
+*.swp
+*~
+.vscode/
+.idea/
+
+# Working state (treat as scratch unless explicitly committed)
+state/

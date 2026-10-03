@@ -1,0 +1,66 @@
+# compose.yaml — minimal sketch: relay + two personas, sharing host `nak` and DoT state.
+#
+# This is a *sketch*. Real persona images, secrets, and relay config come later.
+# The point of this file right now is to lock in the bind-mount + nak-mount
+# contract so personas can be wired without re-deciding it.
+#
+# See memory/2026-10-03.md for the decisions behind these paths.
+
+services:
+  # Nostr relay. Auth stays on (see decisions).
+  strfry:
+    image: holdstockconsulting/strfry:latest
+    container_name: strfry
+    restart: unless-stopped
+    # strfry config stays in the image for now; persona-side config is what
+    # we care about today. If we later want per-relay DoT state on the host,
+    # add:
+    #   volumes:
+    #     - /etc/nostr/dot/strfry:/etc/nostr/dot:rw
+    networks:
+      - nostr
+
+  # Example persona A. Replace image + env with the real thing.
+  persona-a:
+    build:
+      context: .
+      dockerfile: persona.Dockerfile
+    container_name: persona-a
+    restart: unless-stopped
+    environment:
+      - PERSONA_NAME=persona-a
+      # Pointed at the relay via the shared compose network.
+      - RELAY_URL=ws://strfry:7777
+    volumes:
+      # Host-installed `nak`, mounted read-only at the same path.
+      - /usr/local/bin/nak:/usr/local/bin/nak:ro
+      # Host DoT config + state, rw so caches and runtime state persist
+      # across persona restarts and rebuilds.
+      - /etc/nostr/dot/persona-a:/etc/nostr/dot:rw
+    depends_on:
+      - strfry
+    networks:
+      - nostr
+
+  # Example persona B. Same shape — proves the contract is reusable.
+  persona-b:
+    build:
+      context: .
+      dockerfile: persona.Dockerfile
+    container_name: persona-b
+    restart: unless-stopped
+    environment:
+      - PERSONA_NAME=persona-b
+      - RELAY_URL=ws://strfry:7777
+    volumes:
+      - /usr/local/bin/nak:/usr/local/bin/nak:ro
+      - /etc/nostr/dot/persona-b:/etc/nostr/dot:rw
+    depends_on:
+      - strfry
+    networks:
+      - nostr
+
+networks:
+  nostr:
+    driver: bridge
+    name: nostr
