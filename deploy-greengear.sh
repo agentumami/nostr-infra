@@ -32,7 +32,7 @@ else
 fi
 
 echo "==== 2/5  install nak (via repo script) ===="
-"${REPO_DIR}/install-nak.sh"
+sudo "${REPO_DIR}/install-nak.sh"
 
 echo "==== 3/5  persona state dirs ===="
 sudo mkdir -p /etc/nostr/veyra /etc/nostr/strix /etc/nostr/kestrel
