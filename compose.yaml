@@ -1,62 +1,105 @@
-# compose.yaml — minimal sketch: relay + two personas, sharing host `nak` and DoT state.
+# compose.yaml — nostr-infra reference stack
 #
-# This is a *sketch*. Real persona images, secrets, and relay config come later.
-# The point of this file right now is to lock in the bind-mount + nak-mount
-# contract so personas can be wired without re-deciding it.
+# One strfry relay + three personas (veyra, strix, kestrel).
+# Each persona has its own MSISDN and its own Nostr keypair, and binds
+# the two with a self-signed kind:0 profile event on first boot. The
+# binding events together are the "Directory of Truth" for this mock-up
+# — anyone who trusts the persona pubkeys can verify "I am Veyra, my
+# phone number is +1 202-555-0147" by checking the sig on that event.
 #
-# See memory/2026-10-03.md for the decisions behind these paths.
+# See memory/2026-10-03.md and memory/2026-10-04.md for the decisions.
 
 services:
-  # Nostr relay. Auth stays on (see decisions).
+
+  # --- relay ---
+  # Uses the official strfry image; no local Dockerfile. We may add a
+  # custom strfry.conf later (see README); for the mock-up the image
+  # defaults are fine. Auth stays ON (see memory/2026-10-03.md).
   strfry:
     image: holdstockconsulting/strfry:latest
     container_name: strfry
     restart: unless-stopped
-    # strfry config stays in the image for now; persona-side config is what
-    # we care about today. If we later want per-relay DoT state on the host,
-    # add:
-    #   volumes:
-    #     - /etc/nostr/dot/strfry:/etc/nostr/dot:rw
     networks:
       - nostr
 
-  # Example persona A. Replace image + env with the real thing.
-  persona-a:
+  # --- persona base image ---
+  # Built once locally; per-persona services build FROM it.
+  persona-base:
     build:
       context: .
-      dockerfile: persona.Dockerfile
-    container_name: persona-a
+      dockerfile: persona-base.Dockerfile
+    image: persona-base:latest
+    # No CMD — it's a base. Per-persona Dockerfiles inherit ENTRYPOINT
+    # from here only if they don't override it; they do override, so
+    # this service exists purely to materialize the image.
+
+  # --- personas ---
+  # Same shape per persona:
+  #   - build from persona-base + persona-specific Dockerfile
+  #   - PERONA_NAME / PERSONA_MSISDN baked at build time
+  #   - RELAY_URL points at the strfry service on the shared network
+  #   - /usr/local/bin/nak bind-mounted ro from the host (the same path
+  #     install-nak.sh installs to, so `nak` Just Works)
+  #   - /etc/nostr/state bind-mounted rw from /etc/nostr/<persona> on
+  #     the host so nsec + npub persist across restarts/rebuilds
+
+  veyra:
+    build:
+      context: .
+      dockerfile: veyra.Dockerfile
+      args:
+        PERSONA_NAME: veyra
+        PERSONA_MSISDN: "+12025550147"
+    container_name: veyra
     restart: unless-stopped
     environment:
-      - PERSONA_NAME=persona-a
-      # Pointed at the relay via the shared compose network.
       - RELAY_URL=ws://strfry:7777
     volumes:
-      # Host-installed `nak`, mounted read-only at the same path.
       - /usr/local/bin/nak:/usr/local/bin/nak:ro
-      # Host DoT config + state, rw so caches and runtime state persist
-      # across persona restarts and rebuilds.
-      - /etc/nostr/dot/persona-a:/etc/nostr/dot:rw
+      - /etc/nostr/veyra:/etc/nostr/state:rw
     depends_on:
       - strfry
+      - persona-base
     networks:
       - nostr
 
-  # Example persona B. Same shape — proves the contract is reusable.
-  persona-b:
+  strix:
     build:
       context: .
-      dockerfile: persona.Dockerfile
-    container_name: persona-b
+      dockerfile: strix.Dockerfile
+      args:
+        PERSONA_NAME: strix
+        PERSONA_MSISDN: "+12025550183"
+    container_name: strix
     restart: unless-stopped
     environment:
-      - PERSONA_NAME=persona-b
       - RELAY_URL=ws://strfry:7777
     volumes:
       - /usr/local/bin/nak:/usr/local/bin/nak:ro
-      - /etc/nostr/dot/persona-b:/etc/nostr/dot:rw
+      - /etc/nostr/strix:/etc/nostr/state:rw
     depends_on:
       - strfry
+      - persona-base
+    networks:
+      - nostr
+
+  kestrel:
+    build:
+      context: .
+      dockerfile: kestrel.Dockerfile
+      args:
+        PERSONA_NAME: kestrel
+        PERSONA_MSISDN: "+12025550196"
+    container_name: kestrel
+    restart: unless-stopped
+    environment:
+      - RELAY_URL=ws://strfry:7777
+    volumes:
+      - /usr/local/bin/nak:/usr/local/bin/nak:ro
+      - /etc/nostr/kestrel:/etc/nostr/state:rw
+    depends_on:
+      - strfry
+      - persona-base
     networks:
       - nostr
 
